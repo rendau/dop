@@ -4,25 +4,29 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/rendau/dop/adapters/logger"
 )
+
+// Options
 
 type OptionsSt struct {
 	Client         *http.Client
-	BaseUrl        string
-	BaseParams     url.Values
-	BaseHeaders    http.Header
-	BaseLogPrefix  string
+	Uri            string
+	Method         string
+	Params         url.Values
+	Headers        http.Header
 	BasicAuthCreds *BasicAuthCredsSt
+	LogFlags       int
+	LogPrefix      string
+	RetryCount     int
+	RetryInterval  time.Duration
+	Timeout        time.Duration
 
-	Method        string
-	Path          string
-	Params        url.Values
-	Headers       http.Header
-	LogFlags      int
-	LogPrefix     string
-	RetryCount    int
-	RetryInterval time.Duration
-	Timeout       time.Duration
+	ReqBody      []byte
+	ReqObj       any
+	RepObj       any
+	StatusRepObj map[int]any
 }
 
 type BasicAuthCredsSt struct {
@@ -30,106 +34,127 @@ type BasicAuthCredsSt struct {
 	Password string
 }
 
-func (o OptionsSt) GetMergedWith(v OptionsSt) OptionsSt {
+func (o OptionsSt) GetMergedWith(val OptionsSt) OptionsSt {
 	res := OptionsSt{
 		Client:         o.Client,
-		BaseUrl:        o.BaseUrl,
-		BaseParams:     o.BaseParams,
-		BaseHeaders:    o.BaseHeaders,
-		BaseLogPrefix:  o.BaseLogPrefix,
-		BasicAuthCreds: o.BasicAuthCreds,
+		Uri:            o.Uri + val.Uri,
 		Method:         o.Method,
-		Path:           o.Path,
-		Params:         o.Params,
-		Headers:        o.Headers,
+		BasicAuthCreds: o.BasicAuthCreds,
 		LogFlags:       o.LogFlags,
-		LogPrefix:      o.LogPrefix,
+		LogPrefix:      o.LogPrefix + val.LogPrefix,
 		RetryCount:     o.RetryCount,
 		RetryInterval:  o.RetryInterval,
 		Timeout:        o.Timeout,
 	}
 
-	if v.Client != nil {
-		res.Client = v.Client
+	// Client
+	if val.Client != nil {
+		res.Client = val.Client
 	}
-	if v.BaseUrl != "" {
-		if v.BaseUrl == "-" {
-			res.BaseUrl = ""
-		} else {
-			res.BaseUrl = v.BaseUrl
-		}
+
+	// Method
+	if val.Method != "" {
+		res.Method = val.Method
 	}
-	if v.BaseParams != nil {
-		res.BaseParams = v.BaseParams
+
+	// Params
+	for k, v := range o.Params {
+		res.Params[k] = v
 	}
-	if v.BaseHeaders != nil {
-		res.BaseHeaders = v.BaseHeaders
+	for k, v := range val.Params {
+		res.Params[k] = v
 	}
-	if v.BaseLogPrefix != "" {
-		if v.BaseLogPrefix == "-" {
-			res.BaseLogPrefix = ""
-		} else {
-			res.BaseLogPrefix = v.BaseLogPrefix
-		}
+
+	// Headers
+	for k, v := range o.Headers {
+		res.Headers[k] = v
 	}
-	if v.BasicAuthCreds != nil {
-		res.BasicAuthCreds = v.BasicAuthCreds
+	for k, v := range val.Headers {
+		res.Headers[k] = v
 	}
-	if v.Method != "" {
-		if v.Method == "-" {
-			res.Method = ""
-		} else {
-			res.Method = v.Method
-		}
+
+	// BasicAuthCreds
+	if val.BasicAuthCreds != nil {
+		res.BasicAuthCreds = val.BasicAuthCreds
 	}
-	if v.Path != "" {
-		if v.Path == "-" {
-			res.Path = ""
-		} else {
-			res.Path = v.Path
-		}
-	}
-	if v.Params != nil {
-		res.Params = v.Params
-	}
-	if v.Headers != nil {
-		res.Headers = v.Headers
-	}
-	if v.LogFlags != 0 {
-		if v.LogFlags < 0 {
+
+	// LogFlags
+	if val.LogFlags != 0 {
+		if val.LogFlags < 0 {
 			res.LogFlags = 0
 		} else {
-			res.LogFlags = v.LogFlags
+			res.LogFlags = val.LogFlags
 		}
 	}
-	if v.LogPrefix != "" {
-		if v.LogPrefix == "-" {
-			res.LogPrefix = ""
-		} else {
-			res.LogPrefix = v.LogPrefix
-		}
-	}
-	if v.RetryCount != 0 {
-		if v.RetryCount < 0 {
+
+	// RetryCount
+	if val.RetryCount != 0 {
+		if val.RetryCount < 0 {
 			res.RetryCount = 0
 		} else {
-			res.RetryCount = v.RetryCount
+			res.RetryCount = val.RetryCount
 		}
 	}
-	if v.RetryInterval != 0 {
-		if v.RetryInterval < 0 {
+
+	// RetryInterval
+	if val.RetryInterval != 0 {
+		if val.RetryInterval < 0 {
 			res.RetryInterval = 0
 		} else {
-			res.RetryInterval = v.RetryInterval
+			res.RetryInterval = val.RetryInterval
 		}
 	}
-	if v.Timeout != 0 {
-		if v.Timeout < 0 {
+
+	// Timeout
+	if val.Timeout != 0 {
+		if val.Timeout < 0 {
 			res.Timeout = 0
 		} else {
-			res.Timeout = v.Timeout
+			res.Timeout = val.Timeout
 		}
 	}
 
 	return res
+}
+
+func (o OptionsSt) HasLogFlag(v int) bool {
+	return o.LogFlags&v > 0
+}
+
+// Resp
+
+type RespSt struct {
+	ReqOpts    OptionsSt
+	StatusCode int
+	BodyRaw    []byte
+	Lg         logger.Lite
+}
+
+func (o *RespSt) Reset() {
+	o.StatusCode = 0
+	o.BodyRaw = nil
+}
+
+func (o *RespSt) LogError(title string, err error, args ...any) {
+	args = append(
+		args,
+		"uri", o.ReqOpts.Uri,
+		"params", o.ReqOpts.Params.Encode(),
+		"req_body", string(o.ReqOpts.ReqBody),
+		"status_code", o.StatusCode,
+		"rep_body", string(o.BodyRaw),
+	)
+	o.Lg.Errorw(o.ReqOpts.LogPrefix+title, err, args...)
+}
+
+func (o *RespSt) LogInfo(title string, args ...any) {
+	args = append(
+		args,
+		"uri", o.ReqOpts.Uri,
+		"params", o.ReqOpts.Params.Encode(),
+		"req_body", string(o.ReqOpts.ReqBody),
+		"status_code", o.StatusCode,
+		"rep_body", string(o.BodyRaw),
+	)
+	o.Lg.Infow(o.ReqOpts.LogPrefix+title, args...)
 }
