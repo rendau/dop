@@ -39,12 +39,18 @@ func (o OptionsSt) GetMergedWith(val OptionsSt) OptionsSt {
 		Client:         o.Client,
 		Uri:            o.Uri + val.Uri,
 		Method:         o.Method,
+		Params:         url.Values{},
+		Headers:        http.Header{},
 		BasicAuthCreds: o.BasicAuthCreds,
 		LogFlags:       o.LogFlags,
 		LogPrefix:      o.LogPrefix + val.LogPrefix,
 		RetryCount:     o.RetryCount,
 		RetryInterval:  o.RetryInterval,
 		Timeout:        o.Timeout,
+		ReqBody:        o.ReqBody,
+		ReqObj:         o.ReqObj,
+		RepObj:         o.RepObj,
+		StatusRepObj:   o.StatusRepObj,
 	}
 
 	// Client
@@ -55,6 +61,9 @@ func (o OptionsSt) GetMergedWith(val OptionsSt) OptionsSt {
 	// Method
 	if val.Method != "" {
 		res.Method = val.Method
+	}
+	if res.Method == "" {
+		res.Method = "GET"
 	}
 
 	// Params
@@ -112,6 +121,26 @@ func (o OptionsSt) GetMergedWith(val OptionsSt) OptionsSt {
 		} else {
 			res.Timeout = val.Timeout
 		}
+	}
+
+	// ReqBody
+	if val.ReqBody != nil {
+		res.ReqBody = val.ReqBody
+	}
+
+	// ReqObj
+	if val.ReqObj != nil {
+		res.ReqObj = val.ReqObj
+	}
+
+	// RepObj
+	if val.RepObj != nil {
+		res.RepObj = val.RepObj
+	}
+
+	// StatusRepObj
+	if val.StatusRepObj != nil {
+		res.StatusRepObj = val.StatusRepObj
 	}
 
 	return res

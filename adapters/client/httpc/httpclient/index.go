@@ -20,18 +20,25 @@ type St struct {
 }
 
 func New(lg logger.Lite, opts httpc.OptionsSt) *St {
-	if opts.Uri != "" {
-		opts.Uri = strings.TrimRight(opts.Uri, "/") + "/"
+	res := &St{
+		lg: lg,
 	}
 
-	return &St{
-		lg:   lg,
-		opts: opts,
-	}
+	res.SetOptions(opts)
+
+	return res
 }
 
 func (c *St) GetOptions() httpc.OptionsSt {
 	return c.opts
+}
+
+func (c *St) SetOptions(opts httpc.OptionsSt) {
+	if opts.Uri != "" {
+		opts.Uri = strings.TrimRight(opts.Uri, "/") + "/"
+	}
+
+	c.opts = opts
 }
 
 func (c *St) Send(opts httpc.OptionsSt) (*httpc.RespSt, error) {
@@ -49,10 +56,9 @@ func (c *St) Send(opts httpc.OptionsSt) (*httpc.RespSt, error) {
 		resp.Reset()
 		err = c.send(opts, resp)
 		if err == nil {
-			break
-		}
-		if resp.StatusCode > 0 && resp.StatusCode < 500 { // not retry for "< 500" errors
-			break
+			if resp.StatusCode < 500 { // not retry for "< 500" errors
+				break
+			}
 		}
 		if opts.RetryInterval > 0 && i > 0 {
 			time.Sleep(opts.RetryInterval)
