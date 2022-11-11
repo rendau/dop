@@ -34,8 +34,8 @@ type BasicAuthCredsSt struct {
 	Password string
 }
 
-func (o OptionsSt) GetMergedWith(val OptionsSt) OptionsSt {
-	res := OptionsSt{
+func (o *OptionsSt) GetMergedWith(val *OptionsSt) *OptionsSt {
+	res := &OptionsSt{
 		Client:         o.Client,
 		Uri:            o.Uri + val.Uri,
 		Method:         o.Method,
@@ -146,14 +146,14 @@ func (o OptionsSt) GetMergedWith(val OptionsSt) OptionsSt {
 	return res
 }
 
-func (o OptionsSt) HasLogFlag(v int) bool {
+func (o *OptionsSt) HasLogFlag(v int) bool {
 	return o.LogFlags&v > 0
 }
 
 // Resp
 
 type RespSt struct {
-	ReqOpts    OptionsSt
+	ReqOpts    *OptionsSt
 	StatusCode int
 	BodyRaw    []byte
 	Lg         logger.Lite

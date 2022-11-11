@@ -16,10 +16,10 @@ import (
 
 type St struct {
 	lg   logger.Lite
-	opts httpc.OptionsSt
+	opts *httpc.OptionsSt
 }
 
-func New(lg logger.Lite, opts httpc.OptionsSt) *St {
+func New(lg logger.Lite, opts *httpc.OptionsSt) *St {
 	res := &St{
 		lg: lg,
 	}
@@ -29,11 +29,11 @@ func New(lg logger.Lite, opts httpc.OptionsSt) *St {
 	return res
 }
 
-func (c *St) GetOptions() httpc.OptionsSt {
+func (c *St) GetOptions() *httpc.OptionsSt {
 	return c.opts
 }
 
-func (c *St) SetOptions(opts httpc.OptionsSt) {
+func (c *St) SetOptions(opts *httpc.OptionsSt) {
 	if opts.Uri != "" {
 		opts.Uri = strings.TrimRight(opts.Uri, "/") + "/"
 	}
@@ -41,12 +41,29 @@ func (c *St) SetOptions(opts httpc.OptionsSt) {
 	c.opts = opts
 }
 
-func (c *St) Send(opts httpc.OptionsSt) (*httpc.RespSt, error) {
+func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 	var err error
 
 	opts = c.opts.GetMergedWith(opts)
 
 	resp := &httpc.RespSt{ReqOpts: opts, Lg: c.lg}
+
+	// ReqObj
+	if len(opts.Headers.Values("Content-Type")) == 0 {
+		opts.Headers["Content-Type"] = []string{"application/json"}
+	}
+	opts.ReqBody, err = json.Marshal(opts.ReqObj)
+	if err != nil {
+		c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
+		return resp, err
+	}
+
+	// RepObj
+	if opts.RepObj != nil {
+		if len(opts.Headers.Values("Accept")) == 0 {
+			opts.Headers["Accept"] = []string{"application/json"}
+		}
+	}
 
 	if opts.HasLogFlag(httpc.LogRequest) {
 		resp.LogInfo("Request: " + opts.Uri)
@@ -68,6 +85,17 @@ func (c *St) Send(opts httpc.OptionsSt) (*httpc.RespSt, error) {
 	if err == nil {
 		err = c.handleRespBadStatusCode(resp)
 		if err == nil {
+			// RepObj
+			if len(resp.BodyRaw) > 0 && resp.ReqOpts.RepObj != nil {
+				err = json.Unmarshal(resp.BodyRaw, resp.ReqOpts.RepObj)
+				if err != nil {
+					if !resp.ReqOpts.HasLogFlag(httpc.NoLogError) {
+						resp.LogError("Fail to unmarshal body", err)
+					}
+					return resp, err
+				}
+			}
+
 			if opts.HasLogFlag(httpc.LogResponse) {
 				resp.LogInfo("Response: " + opts.Uri)
 			}
@@ -81,7 +109,7 @@ func (c *St) Send(opts httpc.OptionsSt) (*httpc.RespSt, error) {
 	return resp, err
 }
 
-func (c *St) send(opts httpc.OptionsSt, resp *httpc.RespSt) error {
+func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 	var err error
 
 	var req *http.Request
@@ -128,11 +156,17 @@ func (c *St) send(opts httpc.OptionsSt, resp *httpc.RespSt) error {
 
 func (c *St) handleRespBadStatusCode(resp *httpc.RespSt) error {
 	if resp.StatusCode > 0 && (resp.StatusCode < 200 || resp.StatusCode > 299) {
-		hasStatusObj := false
-		if resp.ReqOpts.StatusRepObj != nil {
-			_, hasStatusObj = resp.ReqOpts.StatusRepObj[resp.StatusCode]
-		}
-		if !resp.ReqOpts.HasLogFlag(httpc.NoLogError) && !resp.ReqOpts.HasLogFlag(httpc.NoLogBadStatus) && !hasStatusObj {
+		if sObj, ok := resp.ReqOpts.StatusRepObj[resp.StatusCode]; ok {
+			if len(resp.BodyRaw) > 0 {
+				err := json.Unmarshal(resp.BodyRaw, sObj)
+				if err != nil {
+					if !resp.ReqOpts.HasLogFlag(httpc.NoLogError) {
+						resp.LogError("Fail to unmarshal body", err)
+					}
+					return err
+				}
+			}
+		} else if !resp.ReqOpts.HasLogFlag(httpc.NoLogError) && !resp.ReqOpts.HasLogFlag(httpc.NoLogBadStatus) {
 			switch {
 			case resp.StatusCode == 401 && resp.ReqOpts.HasLogFlag(httpc.NoLogNotAuthorized):
 			case resp.StatusCode == 403 && resp.ReqOpts.HasLogFlag(httpc.NoLogPermissionDenied):
@@ -144,87 +178,4 @@ func (c *St) handleRespBadStatusCode(resp *httpc.RespSt) error {
 	}
 
 	return nil
-}
-
-func (c *St) SendJson(opts httpc.OptionsSt) (*httpc.RespSt, error) {
-	var err error
-
-	if opts.Headers == nil {
-		opts.Headers = http.Header{}
-	}
-
-	if len(c.opts.Headers.Values("Content-Type")) == 0 && len(opts.Headers.Values("Content-Type")) == 0 {
-		opts.Headers["Content-Type"] = []string{"application/json"}
-	}
-
-	opts.ReqBody, err = json.Marshal(opts.ReqObj)
-	if err != nil {
-		c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
-		return &httpc.RespSt{ReqOpts: opts, Lg: c.lg}, err
-	}
-
-	return c.Send(opts)
-}
-
-func (c *St) SendRecvJson(opts httpc.OptionsSt) (*httpc.RespSt, error) {
-	if opts.Headers == nil {
-		opts.Headers = http.Header{}
-	}
-
-	if len(c.opts.Headers.Values("Accept")) == 0 && len(opts.Headers.Values("Accept")) == 0 {
-		opts.Headers["Accept"] = []string{"application/json"}
-	}
-
-	resp, err := c.Send(opts)
-	if err != nil {
-		if err != dopErrs.BadStatusCode {
-			return resp, err
-		}
-	}
-
-	if len(resp.BodyRaw) > 0 {
-		if err == nil {
-			if resp.ReqOpts.RepObj != nil {
-				err = json.Unmarshal(resp.BodyRaw, resp.ReqOpts.RepObj)
-				if err != nil {
-					if !resp.ReqOpts.HasLogFlag(httpc.NoLogError) {
-						resp.LogError("Fail to unmarshal body", err)
-					}
-				}
-			}
-		} else if resp.StatusCode > 0 {
-			if resp.ReqOpts.StatusRepObj != nil {
-				if rObj, ok := resp.ReqOpts.StatusRepObj[resp.StatusCode]; ok {
-					err = json.Unmarshal(resp.BodyRaw, rObj)
-					if err != nil {
-						if !resp.ReqOpts.HasLogFlag(httpc.NoLogError) {
-							resp.LogError("Fail to unmarshal body", err)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return resp, err
-}
-
-func (c *St) SendJsonRecvJson(opts httpc.OptionsSt) (*httpc.RespSt, error) {
-	var err error
-
-	if opts.Headers == nil {
-		opts.Headers = http.Header{}
-	}
-
-	if len(c.opts.Headers.Values("Content-Type")) == 0 && len(opts.Headers.Values("Content-Type")) == 0 {
-		opts.Headers["Content-Type"] = []string{"application/json"}
-	}
-
-	opts.ReqBody, err = json.Marshal(opts.ReqObj)
-	if err != nil {
-		c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
-		return &httpc.RespSt{ReqOpts: opts, Lg: c.lg}, err
-	}
-
-	return c.SendRecvJson(opts)
 }

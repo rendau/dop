@@ -1,9 +1,7 @@
 package httpc
 
 type HttpC interface {
-	GetOptions() OptionsSt
-	Send(opts OptionsSt) (*RespSt, error)
-	SendJson(opts OptionsSt) (*RespSt, error)
-	SendRecvJson(opts OptionsSt) (*RespSt, error)
-	SendJsonRecvJson(opts OptionsSt) (*RespSt, error)
+	GetOptions() *OptionsSt
+	SetOptions(opts *OptionsSt)
+	Send(opts *OptionsSt) (*RespSt, error)
 }
