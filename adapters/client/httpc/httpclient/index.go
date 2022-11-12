@@ -49,13 +49,15 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 	resp := &httpc.RespSt{ReqOpts: opts, Lg: c.lg}
 
 	// ReqObj
-	if len(opts.Headers.Values("Content-Type")) == 0 {
-		opts.Headers["Content-Type"] = []string{"application/json"}
-	}
-	opts.ReqBody, err = json.Marshal(opts.ReqObj)
-	if err != nil {
-		c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
-		return resp, err
+	if opts.ReqObj != nil {
+		if len(opts.Headers.Values("Content-Type")) == 0 {
+			opts.Headers["Content-Type"] = []string{"application/json"}
+		}
+		opts.ReqBody, err = json.Marshal(opts.ReqObj)
+		if err != nil {
+			c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
+			return resp, err
+		}
 	}
 
 	// RepObj
@@ -126,10 +128,14 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 	}
 
 	// headers
-	req.Header = opts.Headers
+	if len(opts.Headers) > 0 {
+		req.Header = opts.Headers
+	}
 
 	// params
-	req.URL.RawQuery = opts.Params.Encode()
+	if len(opts.Params) > 0 {
+		req.URL.RawQuery = opts.Params.Encode()
+	}
 
 	// Basic auth
 	if opts.BasicAuthCreds != nil {
