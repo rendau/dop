@@ -22,8 +22,6 @@ import (
 func TestHttpc(t *testing.T) {
 	const ServerPort = "29714"
 
-	var err error
-
 	sReqObj := struct {
 		headers http.Header
 		params  url.Values
@@ -189,6 +187,7 @@ func TestHttpc(t *testing.T) {
 		},
 	}
 
+	var err error
 	var resp *httpc.RespSt
 
 	for cI, c := range cases {
