@@ -47,10 +47,6 @@ func (o *OptionsSt) GetMergedWith(val *OptionsSt) *OptionsSt {
 		RetryCount:     o.RetryCount,
 		RetryInterval:  o.RetryInterval,
 		Timeout:        o.Timeout,
-		ReqBody:        o.ReqBody,
-		ReqObj:         o.ReqObj,
-		RepObj:         o.RepObj,
-		StatusRepObj:   o.StatusRepObj,
 	}
 
 	// Client
