@@ -50,6 +50,10 @@ func (c *St) SetResponse(path string, response ResponseSt) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if response.Resp == nil {
+		response.Resp = &httpc.RespSt{}
+	}
+
 	response.Resp.Lg = c.lg
 
 	if len(response.Resp.BodyRaw) == 0 && response.RespObj != nil {

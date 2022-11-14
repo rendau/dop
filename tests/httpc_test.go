@@ -82,6 +82,7 @@ func TestHttpc(t *testing.T) {
 		wantSReqHeaders   map[string]string
 		wantSReqParams    map[string]string
 		wantSReqBodyCheck bool
+		wantSReqBodyEmpty bool
 		wantRepObj        map[string]string
 		wantStatusRepObj  map[int]any
 	}{
@@ -185,6 +186,14 @@ func TestHttpc(t *testing.T) {
 			},
 			wantStatusCode: 200,
 		},
+		{
+			baseOpts: &httpc.OptionsSt{},
+			reqOpts: &httpc.OptionsSt{
+				Uri: "s200?asd=dsa",
+			},
+			wantStatusCode: 200,
+			wantSReqParams: map[string]string{"asd": "dsa"},
+		},
 	}
 
 	var err error
@@ -214,7 +223,9 @@ func TestHttpc(t *testing.T) {
 			require.Equal(t, c.wantStatusCode, resp.StatusCode)
 
 			// ReqObj
-			if c.wantSReqBodyCheck {
+			if c.wantSReqBodyEmpty {
+				require.Empty(t, c.reqOpts.ReqObj)
+			} else if c.wantSReqBodyCheck {
 				if c.reqOpts.ReqObj != nil {
 					raw, err := json.Marshal(c.reqOpts.ReqObj)
 					require.Nil(t, err)

@@ -16,13 +16,12 @@ func New(httpc httpc.HttpC) *St {
 }
 
 func (m *St) Send(data *mail.SendReqSt) bool {
-	_, _, err := m.httpc.SendJson(data, httpc.OptionsSt{
+	_, err := m.httpc.Send(&httpc.OptionsSt{
 		Method: "POST",
-		Path:   "send",
-	})
-	if err != nil {
-		return false
-	}
+		Uri:    "send",
 
-	return true
+		ReqObj: data,
+	})
+
+	return err == nil
 }

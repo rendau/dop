@@ -15,17 +15,16 @@ func New(httpc httpc.HttpC) *St {
 }
 
 func (s *St) Send(phone string, msg string) bool {
-	_, _, err := s.httpc.SendJson(SendReqSt{
-		To:   phone,
-		Text: msg,
-		Sync: true,
-	}, httpc.OptionsSt{
+	_, err := s.httpc.Send(&httpc.OptionsSt{
 		Method: "POST",
-		Path:   "send",
-	})
-	if err != nil {
-		return false
-	}
+		Uri:    "send",
 
-	return true
+		ReqObj: SendReqSt{
+			To:   phone,
+			Text: msg,
+			Sync: true,
+		},
+	})
+
+	return err == nil
 }
