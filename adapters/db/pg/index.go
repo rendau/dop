@@ -248,8 +248,17 @@ func (d *St) HfList(ctx context.Context, ops db.RDBListOptions) (int64, error) {
 
 	qWhere := d.HfOptionalWhere(ops.Conds)
 
+	distinct := ``
+	if ops.Distinct {
+		distinct = `distinct `
+	}
+	countCol := ops.CountCol
+	if ops.CountCol == "" {
+		countCol = "*"
+	}
+
 	if (ops.LPars.WithTotalCount && ops.LPars.PageSize > 0) || ops.LPars.OnlyCount {
-		err := d.DbQueryRowM(ctx, `select count(*)`+
+		err := d.DbQueryRowM(ctx, `select count(`+distinct+ops.ColTableAlias+countCol+`)`+
 			` from `+strings.Join(ops.Tables, " ")+
 			qWhere, ops.Args).Scan(&tCount)
 		if err != nil {
@@ -317,7 +326,7 @@ func (d *St) HfList(ctx context.Context, ops db.RDBListOptions) (int64, error) {
 		qLimit = ` limit ` + strconv.FormatInt(ops.LPars.PageSize, 10)
 	}
 
-	query := `select ` + strings.Join(colExps, ",") +
+	query := `select ` + distinct + strings.Join(colExps, ",") +
 		` from ` + strings.Join(ops.Tables, " ") +
 		qWhere +
 		qOrderBy +
@@ -379,7 +388,7 @@ func (d *St) hfGenerateColumns(stFields map[string]string, ops db.RDBListOptions
 			if exp = colExpMap[k]; exp != "" {
 				colExps = append(colExps, exp)
 			} else {
-				colExps = append(colExps, k)
+				colExps = append(colExps, ops.ColTableAlias+k)
 			}
 			fieldNames = append(fieldNames, v)
 		}
@@ -389,7 +398,7 @@ func (d *St) hfGenerateColumns(stFields map[string]string, ops db.RDBListOptions
 				if exp = colExpMap[cn]; exp != "" {
 					colExps = append(colExps, exp)
 				} else {
-					colExps = append(colExps, cn)
+					colExps = append(colExps, ops.ColTableAlias+cn)
 				}
 				fieldNames = append(fieldNames, fn)
 			}

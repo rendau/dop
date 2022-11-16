@@ -5,11 +5,14 @@ import (
 )
 
 type RDBListOptions struct {
+	Distinct         bool
 	Dst              any
 	Tables           []string
 	LPars            dopTypes.ListParams
 	Conds            []string
 	Args             map[string]any
+	ColTableAlias    string
+	CountCol         string
 	ColExprs         map[string]string
 	AllowedSorts     map[string]string
 	AllowedSortNames map[string]string
