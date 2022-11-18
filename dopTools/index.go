@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/rendau/dop/adapters/logger"
 	"github.com/rendau/dop/dopErrs"
 	"github.com/rendau/dop/dopTypes"
 	"github.com/spf13/viper"
@@ -201,5 +202,11 @@ func SetViperDefaultsFromObj(obj any) {
 		tagName = strings.SplitN(fieldTag, ",", 2)[0]
 
 		viper.SetDefault(tagName, "")
+	}
+}
+
+func PanicRecover(lg logger.WarnAndError, msg string) {
+	if recoverRep := recover(); recoverRep != nil { // recovery error
+		lg.Errorw("Panic: "+msg, nil, "rec_err", recoverRep)
 	}
 }
