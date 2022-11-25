@@ -1,6 +1,7 @@
 package httpc
 
 import (
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -23,8 +24,10 @@ type OptionsSt struct {
 	RetryInterval  time.Duration
 	Timeout        time.Duration
 
+	ReqStream    io.Reader
 	ReqBody      []byte
 	ReqObj       any
+	RepStream    bool
 	RepObj       any
 	StatusRepObj map[int]any
 }
@@ -149,15 +152,18 @@ func (o *OptionsSt) HasLogFlag(v int) bool {
 // Resp
 
 type RespSt struct {
-	ReqOpts    *OptionsSt
-	StatusCode int
-	BodyRaw    []byte
-	Lg         logger.Lite
+	ReqOpts           *OptionsSt
+	StatusCode        int
+	StatusCodeSuccess bool
+	BodyRaw           []byte
+	Stream            io.ReadCloser
+	Lg                logger.Lite
 }
 
 func (o *RespSt) Reset() {
 	o.StatusCode = 0
 	o.BodyRaw = nil
+	o.Stream = nil
 }
 
 func (o *RespSt) LogError(title string, err error, args ...any) {

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -49,14 +49,20 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 	resp := &httpc.RespSt{ReqOpts: opts, Lg: c.lg}
 
 	// ReqObj
-	if opts.ReqObj != nil {
-		if len(opts.Headers.Values("Content-Type")) == 0 {
-			opts.Headers["Content-Type"] = []string{"application/json"}
-		}
-		opts.ReqBody, err = json.Marshal(opts.ReqObj)
-		if err != nil {
-			c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
-			return resp, err
+	if opts.ReqStream == nil {
+		if len(opts.ReqBody) > 0 {
+			opts.ReqStream = bytes.NewReader(opts.ReqBody)
+		} else if opts.ReqObj != nil {
+			if len(opts.Headers.Values("Content-Type")) == 0 {
+				opts.Headers["Content-Type"] = []string{"application/json"}
+			}
+			opts.ReqBody, err = json.Marshal(opts.ReqObj)
+			if err != nil {
+				c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
+				return resp, err
+			}
+
+			opts.ReqStream = bytes.NewReader(opts.ReqBody)
 		}
 	}
 
@@ -119,9 +125,9 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 	if opts.Timeout > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
 		defer cancel()
-		req, err = http.NewRequestWithContext(ctx, opts.Method, opts.Uri, bytes.NewBuffer(opts.ReqBody))
+		req, err = http.NewRequestWithContext(ctx, opts.Method, opts.Uri, opts.ReqStream)
 	} else {
-		req, err = http.NewRequest(opts.Method, opts.Uri, bytes.NewBuffer(opts.ReqBody))
+		req, err = http.NewRequest(opts.Method, opts.Uri, opts.ReqStream)
 	}
 	if err != nil {
 		return err
@@ -147,21 +153,23 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 	if err != nil {
 		return err
 	}
-	defer rep.Body.Close()
-
-	// read response body
-	resp.BodyRaw, err = ioutil.ReadAll(rep.Body)
-	if err != nil {
-		return err
-	}
 
 	resp.StatusCode = rep.StatusCode
+	resp.StatusCodeSuccess = rep.StatusCode >= http.StatusOK && rep.StatusCode < http.StatusMultipleChoices
+	resp.Stream = rep.Body
+
+	if !opts.RepStream || !resp.StatusCodeSuccess {
+		resp.BodyRaw, err = io.ReadAll(rep.Body)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
 func (c *St) handleRespBadStatusCode(resp *httpc.RespSt) error {
-	if resp.StatusCode > 0 && (resp.StatusCode < 200 || resp.StatusCode > 299) {
+	if resp.StatusCode > 0 && !resp.StatusCodeSuccess {
 		if sObj, ok := resp.ReqOpts.StatusRepObj[resp.StatusCode]; ok {
 			if len(resp.BodyRaw) > 0 {
 				err := json.Unmarshal(resp.BodyRaw, sObj)

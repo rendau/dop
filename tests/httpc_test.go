@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -37,7 +37,7 @@ func TestHttpc(t *testing.T) {
 	r.GET("/s200", func(c *gin.Context) {
 		sReqObj.headers = c.Request.Header
 		sReqObj.params = c.Request.URL.Query()
-		body, err := ioutil.ReadAll(c.Request.Body)
+		body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			c.Status(500)
 			return
