@@ -122,6 +122,11 @@ func (o *OptionsSt) GetMergedWith(val *OptionsSt) *OptionsSt {
 		}
 	}
 
+	// ReqStream
+	if val.ReqStream != nil {
+		res.ReqStream = val.ReqStream
+	}
+
 	// ReqBody
 	if val.ReqBody != nil {
 		res.ReqBody = val.ReqBody
@@ -130,6 +135,11 @@ func (o *OptionsSt) GetMergedWith(val *OptionsSt) *OptionsSt {
 	// ReqObj
 	if val.ReqObj != nil {
 		res.ReqObj = val.ReqObj
+	}
+
+	// RepStream
+	if val.RepStream {
+		res.RepStream = val.RepStream
 	}
 
 	// RepObj

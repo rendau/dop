@@ -50,9 +50,7 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 
 	// ReqObj
 	if opts.ReqStream == nil {
-		if len(opts.ReqBody) > 0 {
-			opts.ReqStream = bytes.NewReader(opts.ReqBody)
-		} else if opts.ReqObj != nil {
+		if opts.ReqObj != nil {
 			if len(opts.Headers.Values("Content-Type")) == 0 {
 				opts.Headers["Content-Type"] = []string{"application/json"}
 			}
@@ -61,8 +59,6 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 				c.lg.Errorw(opts.LogPrefix+"Fail to marshal json", err)
 				return resp, err
 			}
-
-			opts.ReqStream = bytes.NewReader(opts.ReqBody)
 		}
 	}
 
@@ -81,6 +77,9 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 		resp.Reset()
 		err = c.send(opts, resp)
 		if err == nil {
+			if opts.ReqStream != nil { // not retry for stream
+				break
+			}
 			if resp.StatusCode < 500 { // not retry for "< 500" errors
 				break
 			}
@@ -122,12 +121,19 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 
 	var req *http.Request
 
+	var reqStream io.Reader
+	if opts.ReqStream != nil {
+		reqStream = opts.ReqStream
+	} else if len(opts.ReqBody) > 0 {
+		reqStream = bytes.NewReader(opts.ReqBody)
+	}
+
 	if opts.Timeout > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), opts.Timeout)
 		defer cancel()
-		req, err = http.NewRequestWithContext(ctx, opts.Method, opts.Uri, opts.ReqStream)
+		req, err = http.NewRequestWithContext(ctx, opts.Method, opts.Uri, reqStream)
 	} else {
-		req, err = http.NewRequest(opts.Method, opts.Uri, opts.ReqStream)
+		req, err = http.NewRequest(opts.Method, opts.Uri, reqStream)
 	}
 	if err != nil {
 		return err

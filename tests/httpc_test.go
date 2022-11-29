@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,6 +118,19 @@ func TestHttpc(t *testing.T) {
 		},
 		{
 			baseOpts: &httpc.OptionsSt{
+				RetryCount:    3,
+				RetryInterval: 10 * time.Millisecond,
+			},
+			reqOpts: &httpc.OptionsSt{
+				Uri:       "e500",
+				ReqStream: strings.NewReader(`{"a": "1"}`),
+			},
+			e500Cnt:        1,
+			wantErr:        dopErrs.BadStatusCode,
+			wantStatusCode: 500,
+		},
+		{
+			baseOpts: &httpc.OptionsSt{
 				RetryCount:    1,
 				RetryInterval: 10 * time.Millisecond,
 			},
@@ -157,6 +171,17 @@ func TestHttpc(t *testing.T) {
 				Uri:    "s200",
 				ReqObj: map[string]string{"hello": "world"},
 				RepObj: &map[string]string{},
+			},
+			wantStatusCode:    200,
+			wantRepObj:        map[string]string{"a": "1"},
+			wantSReqBodyCheck: true,
+		},
+		{
+			baseOpts: &httpc.OptionsSt{},
+			reqOpts: &httpc.OptionsSt{
+				Uri:     "s200",
+				ReqBody: []byte(`{"hello":"world"}`),
+				RepObj:  &map[string]string{},
 			},
 			wantStatusCode:    200,
 			wantRepObj:        map[string]string{"a": "1"},
@@ -230,6 +255,8 @@ func TestHttpc(t *testing.T) {
 					raw, err := json.Marshal(c.reqOpts.ReqObj)
 					require.Nil(t, err)
 					require.JSONEq(t, string(raw), string(sReqObj.body))
+				} else if c.reqOpts.ReqBody != nil {
+					require.Equal(t, c.reqOpts.ReqBody, sReqObj.body)
 				}
 			}
 
