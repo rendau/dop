@@ -55,6 +55,10 @@ func (m *St) Send(phone string, msg string) bool {
 	return true
 }
 
+func (m *St) SendAsync(phone string, msg string) bool {
+	return m.Send(phone, msg)
+}
+
 func (m *St) PullAll() []Req {
 	m.mu.Lock()
 	defer m.mu.Unlock()
