@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"reflect"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
@@ -207,6 +208,6 @@ func SetViperDefaultsFromObj(obj any) {
 
 func PanicRecover(lg logger.WarnAndError, msg string) {
 	if recoverRep := recover(); recoverRep != nil { // recovery error
-		lg.Errorw("Panic: "+msg, nil, "rec_err", recoverRep)
+		lg.Errorw("Panic (recovered): "+msg, nil, "recovery_error", recoverRep, "recovery_stacktrace", string(debug.Stack()))
 	}
 }

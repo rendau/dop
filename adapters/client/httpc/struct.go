@@ -162,16 +162,18 @@ func (o *OptionsSt) HasLogFlag(v int) bool {
 // Resp
 
 type RespSt struct {
-	ReqOpts           *OptionsSt
+	Lg      logger.Lite
+	ReqOpts *OptionsSt
+
 	StatusCode        int
 	StatusCodeSuccess bool
 	BodyRaw           []byte
 	Stream            io.ReadCloser
-	Lg                logger.Lite
 }
 
 func (o *RespSt) Reset() {
 	o.StatusCode = 0
+	o.StatusCodeSuccess = false
 	o.BodyRaw = nil
 	o.Stream = nil
 }

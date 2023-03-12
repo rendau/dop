@@ -74,17 +74,19 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 	}
 
 	for i := opts.RetryCount; i >= 0; i-- {
-		resp.Reset()
 		err = c.send(opts, resp)
-		if err == nil {
+		if err == nil { // if no network error
 			if opts.ReqStream != nil { // not retry for stream
+				break
+			}
+			if resp.StatusCodeSuccess { // not retry for success
 				break
 			}
 			if resp.StatusCode < 500 { // not retry for "< 500" errors
 				break
 			}
 		}
-		if opts.RetryInterval > 0 && i > 0 {
+		if i > 0 {
 			time.Sleep(opts.RetryInterval)
 		}
 	}
@@ -118,6 +120,8 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 
 func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 	var err error
+
+	resp.Reset()
 
 	var req *http.Request
 
@@ -162,9 +166,12 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 
 	resp.StatusCode = rep.StatusCode
 	resp.StatusCodeSuccess = rep.StatusCode >= http.StatusOK && rep.StatusCode < http.StatusMultipleChoices
-	resp.Stream = rep.Body
 
-	if !opts.RepStream || !resp.StatusCodeSuccess {
+	if opts.RepStream && resp.StatusCodeSuccess {
+		resp.Stream = rep.Body
+	} else {
+		defer rep.Body.Close()
+
 		resp.BodyRaw, err = io.ReadAll(rep.Body)
 		if err != nil {
 			return err
