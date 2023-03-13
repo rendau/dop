@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -140,7 +141,7 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 		req, err = http.NewRequest(opts.Method, opts.Uri, reqStream)
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("fail to create http-request: %w", err)
 	}
 
 	// headers
@@ -158,10 +159,14 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 		req.SetBasicAuth(opts.BasicAuthCreds.Username, opts.BasicAuthCreds.Password)
 	}
 
+	if opts.ReqClose {
+		req.Close = true
+	}
+
 	// Do request
 	rep, err := opts.Client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("fail to do http-request: %w", err)
 	}
 
 	resp.StatusCode = rep.StatusCode
@@ -174,7 +179,7 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 
 		resp.BodyRaw, err = io.ReadAll(rep.Body)
 		if err != nil {
-			return err
+			return fmt.Errorf("fail to read response body: %w", err)
 		}
 	}
 

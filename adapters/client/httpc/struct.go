@@ -24,6 +24,7 @@ type OptionsSt struct {
 	RetryInterval  time.Duration
 	Timeout        time.Duration
 
+	ReqClose     bool
 	ReqStream    io.Reader
 	ReqBody      []byte
 	ReqObj       any
@@ -179,25 +180,25 @@ func (o *RespSt) Reset() {
 }
 
 func (o *RespSt) LogError(title string, err error, args ...any) {
-	args = append(
-		args,
-		"uri", o.ReqOpts.Uri,
-		"params", o.ReqOpts.Params.Encode(),
-		"req_body", string(o.ReqOpts.ReqBody),
-		"status_code", o.StatusCode,
-		"rep_body", string(o.BodyRaw),
-	)
-	o.Lg.Errorw(o.ReqOpts.LogPrefix+title, err, args...)
+	if o.ReqOpts.HasLogFlag(ErrorLogToInfo) {
+		o.LogInfo(title, append(args, "error", err.Error())...)
+	} else {
+		o.Lg.Errorw(o.ReqOpts.LogPrefix+title, err, o.fillLogArgs(args...)...)
+	}
 }
 
 func (o *RespSt) LogInfo(title string, args ...any) {
-	args = append(
-		args,
+	o.Lg.Infow(o.ReqOpts.LogPrefix+title, o.fillLogArgs(args...)...)
+}
+
+func (o *RespSt) fillLogArgs(srcArgs ...any) []any {
+	return append(
+		srcArgs,
+		"method", o.ReqOpts.Method,
 		"uri", o.ReqOpts.Uri,
 		"params", o.ReqOpts.Params.Encode(),
 		"req_body", string(o.ReqOpts.ReqBody),
 		"status_code", o.StatusCode,
 		"rep_body", string(o.BodyRaw),
 	)
-	o.Lg.Infow(o.ReqOpts.LogPrefix+title, args...)
 }
