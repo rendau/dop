@@ -94,8 +94,13 @@ func (c *St) Send(opts *httpc.OptionsSt) (*httpc.RespSt, error) {
 	response, ok := c.responses[opts.Uri]
 	if !ok {
 		c.lg.Infow("Httpc-mock, path not found", "path", opts.Uri)
-		return nil, ErrPageNotFound
+		return &httpc.RespSt{
+			Lg:      c.lg,
+			ReqOpts: opts,
+		}, ErrPageNotFound
 	}
+
+	response.Resp.ReqOpts = opts
 
 	if len(response.Resp.BodyRaw) > 0 && opts.RepObj != nil {
 		err = json.Unmarshal(response.Resp.BodyRaw, opts.RepObj)
