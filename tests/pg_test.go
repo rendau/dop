@@ -109,3 +109,57 @@ func TestDbPgHfList(t *testing.T) {
 		},
 	}, result[1])
 }
+
+func TestDbPgHfCreate(t *testing.T) {
+	err := app.db.DbExec(bgCtx, `drop table if exists t1 cascade`)
+	require.Nil(t, err)
+
+	err = app.db.DbExec(bgCtx, `
+		create table t1 (
+			c1 text
+		);
+	`)
+	require.Nil(t, err)
+
+	obj := struct {
+		C1 **string `json:"c1" db:"c1"`
+	}{
+		C1: dopTools.NewPtr(dopTools.NewPtr("hello")),
+	}
+
+	err = app.db.HfCreate(bgCtx, db.RDBCreateOptions{
+		Table:  `t1`,
+		Obj:    obj,
+		RetCol: "id",
+	})
+	require.Nil(t, err)
+
+	var fVal *string
+
+	err = app.db.DbQueryRow(bgCtx, `
+		select c1 from t1
+	`).Scan(&fVal)
+	require.Nil(t, err)
+	require.NotNil(t, fVal)
+	require.Equal(t, "hello", *fVal)
+
+	err = app.db.DbExec(bgCtx, `truncate t1 restart identity cascade`)
+	require.Nil(t, err)
+
+	var strPtr *string
+
+	obj.C1 = dopTools.NewPtr(strPtr)
+
+	err = app.db.HfCreate(bgCtx, db.RDBCreateOptions{
+		Table:  `t1`,
+		Obj:    obj,
+		RetCol: "id",
+	})
+	require.Nil(t, err)
+
+	err = app.db.DbQueryRow(bgCtx, `
+		select c1 from t1
+	`).Scan(&fVal)
+	require.Nil(t, err)
+	require.Nil(t, fVal)
+}

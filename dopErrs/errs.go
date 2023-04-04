@@ -35,7 +35,7 @@ const (
 	NoRows            = Err("err_no_rows")
 	BadColumnName     = Err("bad_column_name")
 	BadJson           = Err("bad_json")
-	BadJwt            = Err("bad_json")
+	BadJwt            = Err("bad_jwt")
 	BadQueryParams    = Err("bad_query_params")
 	ServiceNA         = Err("service_not_available")
 	NotImplemented    = Err("not_implemented")

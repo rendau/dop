@@ -594,6 +594,11 @@ func (d *St) HfGetCUFields(obj any) (map[string]any, map[string]bool) {
 			continue
 		}
 
+		if field.Type.Kind() == reflect.Pointer &&
+			field.Type.Elem().Kind() == reflect.Pointer {
+			vField = vField.Elem()
+		}
+
 		tagFieldMap[tagName] = vField.Interface()
 
 		for _, tv = range tagValues[1:] {
