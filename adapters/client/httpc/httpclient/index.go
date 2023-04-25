@@ -172,6 +172,8 @@ func (c *St) send(opts *httpc.OptionsSt, resp *httpc.RespSt) error {
 	resp.StatusCode = rep.StatusCode
 	resp.StatusCodeSuccess = rep.StatusCode >= http.StatusOK && rep.StatusCode < http.StatusMultipleChoices
 
+	resp.Headers = rep.Header
+
 	if opts.RepStream && resp.StatusCodeSuccess {
 		resp.Stream = rep.Body
 	} else {

@@ -168,6 +168,7 @@ type RespSt struct {
 
 	StatusCode        int
 	StatusCodeSuccess bool
+	Headers           http.Header
 	BodyRaw           []byte
 	Stream            io.ReadCloser
 }
