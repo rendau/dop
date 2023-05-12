@@ -1,4 +1,4 @@
-package sms
+package krp
 
 type Sms interface {
 	SendJson(topic, key string, value any) error
