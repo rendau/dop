@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/jackc/pgx/v4/stdlib" // driver
+
 	"github.com/rendau/dop/adapters/db"
 	"github.com/rendau/dop/adapters/logger"
 	"github.com/rendau/dop/dopErrs"
