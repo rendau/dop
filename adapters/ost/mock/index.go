@@ -8,8 +8,8 @@ import (
 type St struct {
 }
 
-func New() (*St, error) {
-	return &St{}, nil
+func New() *St {
+	return &St{}
 }
 
 func (o *St) CreateBucket(name string) error {
