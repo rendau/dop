@@ -11,12 +11,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/rendau/dop/adapters/logger"
-	"github.com/rendau/dop/dopErrs"
-	"github.com/rendau/dop/dopTypes"
 	"github.com/spf13/viper"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
+
+	"github.com/rendau/dop/adapters/logger"
+	"github.com/rendau/dop/dopErrs"
+	"github.com/rendau/dop/dopTypes"
 )
 
 var (
@@ -210,4 +211,42 @@ func PanicRecover(lg logger.WarnAndError, msg string) {
 	if recoverRep := recover(); recoverRep != nil { // recovery error
 		lg.Errorw("Panic (recovered): "+msg, nil, "recovery_error", recoverRep, "recovery_stacktrace", string(debug.Stack()))
 	}
+}
+
+// CompareLists - compares two list and returns lists for: delete, update, insert
+func CompareLists[T1 any, T2 any](oldList, newList []*T1, getId func(*T1) string, getChanges func(oldItem *T1, newItem *T1) *T2) (deleteList []*T1, updateList []*T2, insertList []*T1) {
+	dList := make([]*T1, 0)
+	uList := make([]*T2, 0)
+	iList := make([]*T1, 0)
+
+	oldMap := map[string]*T1{}
+	for _, oldItem := range oldList {
+		oldMap[getId(oldItem)] = oldItem
+	}
+
+	newMap := map[string]*T1{}
+	for _, newItem := range newList {
+		newMap[getId(newItem)] = newItem
+	}
+
+	var changes *T2
+
+	for _, oldItem := range oldMap {
+		if newItem := newMap[getId(oldItem)]; newItem != nil {
+			changes = getChanges(oldItem, newItem)
+			if changes != nil {
+				uList = append(uList, changes)
+			}
+		} else {
+			dList = append(dList, oldItem)
+		}
+	}
+
+	for _, newItem := range newMap {
+		if oldItem := oldMap[getId(newItem)]; oldItem == nil {
+			iList = append(iList, newItem)
+		}
+	}
+
+	return dList, uList, iList
 }
