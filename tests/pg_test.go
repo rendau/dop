@@ -1,7 +1,10 @@
 package tests
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/rendau/dop/adapters/db"
 	"github.com/rendau/dop/dopTools"
@@ -115,9 +118,7 @@ func TestDbPgHfCreate(t *testing.T) {
 	require.Nil(t, err)
 
 	err = app.db.DbExec(bgCtx, `
-		create table t1 (
-			c1 text
-		);
+		create table t1 ( c1 text );
 	`)
 	require.Nil(t, err)
 
@@ -162,4 +163,77 @@ func TestDbPgHfCreate(t *testing.T) {
 	`).Scan(&fVal)
 	require.Nil(t, err)
 	require.Nil(t, fVal)
+}
+
+func TestDbPgTx(t *testing.T) {
+	err := app.db.DbExec(bgCtx, `drop table if exists t1 cascade`)
+	require.Nil(t, err)
+
+	err = app.db.DbExec(bgCtx, `
+		create table t1 ( c1 text );
+	`)
+	require.Nil(t, err)
+
+	var cnt int
+
+	err = app.db.TransactionFn(context.Background(), func(ctx context.Context) error {
+		err = app.db.DbExec(ctx, `insert into t1 (c1) values ('hello1')`)
+		if err != nil {
+			return err
+		}
+
+		err = app.db.DbQueryRow(ctx, `select count(*) from t1`).Scan(&cnt)
+		require.Nil(t, err)
+		require.Equal(t, 1, cnt)
+
+		return errors.New("test")
+	})
+	require.NotNil(t, err)
+
+	err = app.db.DbQueryRow(bgCtx, `select count(*) from t1`).Scan(&cnt)
+	require.Nil(t, err)
+	require.Equal(t, 0, cnt)
+
+	err = app.db.TransactionFn(context.Background(), func(ctx context.Context) error {
+		return app.db.DbExec(ctx, `insert into t1 (c1) values ('hello1')`)
+	})
+	require.Nil(t, err)
+
+	err = app.db.DbQueryRow(bgCtx, `select count(*) from t1`).Scan(&cnt)
+	require.Nil(t, err)
+	require.Equal(t, 1, cnt)
+
+	// transaction without data change
+	err = app.db.TransactionFn(context.Background(), func(ctx context.Context) error {
+		var c int
+		return app.db.DbQueryRow(ctx, `select count(*) from t1`).Scan(&c)
+	})
+	require.Nil(t, err)
+}
+
+func TestDbPgTxAsyncCallback(t *testing.T) {
+	err := app.db.DbExec(bgCtx, `drop table if exists t1 cascade`)
+	require.Nil(t, err)
+
+	err = app.db.DbExec(bgCtx, `
+		create table t1 ( c1 text );
+	`)
+	require.Nil(t, err)
+
+	var cnt int
+
+	err = app.db.TransactionFn(context.Background(), func(ctx context.Context) error {
+		app.db.TransactionAddAsyncCallback(ctx, func() {
+			_ = app.db.DbExec(ctx, `insert into t1 (c1) values ('hello2')`)
+		})
+
+		return app.db.DbExec(ctx, `insert into t1 (c1) values ('hello1')`)
+	})
+	require.Nil(t, err)
+
+	time.Sleep(time.Millisecond * 50) // wait for async callback
+
+	err = app.db.DbQueryRow(bgCtx, `select count(*) from t1`).Scan(&cnt)
+	require.Nil(t, err)
+	require.Equal(t, 2, cnt)
 }

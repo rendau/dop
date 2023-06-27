@@ -5,9 +5,11 @@ import (
 	"time"
 )
 
+type transactionCtxKeyT int8
+
 const (
 	ErrPrefix         = "pg-error"
-	TransactionCtxKey = "pg_transaction"
+	transactionCtxKey = transactionCtxKeyT(1)
 )
 
 var defaultOptions = OptionsSt{

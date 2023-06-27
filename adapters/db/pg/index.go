@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/jackc/pgx/v4/stdlib" // driver
-
 	"github.com/rendau/dop/adapters/db"
 	"github.com/rendau/dop/adapters/logger"
 	"github.com/rendau/dop/dopErrs"
@@ -58,95 +57,85 @@ func New(debug bool, lg logger.WarnAndError, opts OptionsSt) (*St, error) {
 
 func (d *St) getCon(ctx context.Context) db.RDBConSt {
 	if tx := d.getContextTransaction(ctx); tx != nil {
-		return tx
+		return tx.tx
 	}
 	return d.Con
 }
 
 // transaction
 
-func (d *St) getContextTransactionContainer(ctx context.Context) *txContainerSt {
-	contextV := ctx.Value(TransactionCtxKey)
+func (d *St) getContextTransaction(ctx context.Context) *txContainerSt {
+	contextV := ctx.Value(transactionCtxKey)
 	if contextV == nil {
 		return nil
 	}
 
-	switch tx := contextV.(type) {
-	case *txContainerSt:
+	if tx, ok := contextV.(*txContainerSt); ok {
 		return tx
-	default:
-		return nil
-	}
-}
-
-func (d *St) getContextTransaction(ctx context.Context) pgx.Tx {
-	container := d.getContextTransactionContainer(ctx)
-	if container != nil {
-		return container.tx
 	}
 
 	return nil
 }
 
-func (d *St) ContextWithTransaction(ctx context.Context) (context.Context, error) {
+func (d *St) contextWithTransaction(ctx context.Context) (context.Context, error) {
+	if d.getContextTransaction(ctx) != nil {
+		return ctx, nil
+	}
+
 	tx, err := d.Con.Begin(ctx)
 	if err != nil {
 		return ctx, d.HErr(err)
 	}
 
-	return context.WithValue(ctx, TransactionCtxKey, &txContainerSt{tx: tx}), nil
+	return context.WithValue(ctx, transactionCtxKey, &txContainerSt{tx: tx}), nil
 }
 
-func (d *St) CommitContextTransaction(ctx context.Context) error {
+func (d *St) commitContextTransaction(ctx context.Context) error {
 	tx := d.getContextTransaction(ctx)
 	if tx == nil {
 		return nil
 	}
 
-	err := tx.Commit(ctx)
+	err := tx.tx.Commit(ctx)
 	if err != nil {
-		if err != pgx.ErrTxClosed &&
-			err != pgx.ErrTxCommitRollback {
-			_ = tx.Rollback(ctx)
+		_ = tx.tx.Rollback(ctx)
 
-			return d.HErr(err)
-		}
+		return d.HErr(err)
 	}
+
+	// run async callbacks
+	go func(callbacks []func()) {
+		for _, f := range callbacks {
+			f()
+		}
+	}(tx.asyncCallbacks)
 
 	return nil
 }
 
-func (d *St) RollbackContextTransaction(ctx context.Context) {
+func (d *St) rollbackContextTransaction(ctx context.Context) {
 	tx := d.getContextTransaction(ctx)
 	if tx == nil {
 		return
 	}
 
-	_ = tx.Rollback(ctx)
+	_ = tx.tx.Rollback(ctx)
 }
 
 func (d *St) RenewContextTransaction(ctx context.Context) error {
 	var err error
 
-	container := d.getContextTransactionContainer(ctx)
-	if container == nil {
-		d.lg.Errorw(ErrPrefix+": Transaction container not found in context", nil)
-		return nil
-	}
-
-	if container.tx != nil {
-		err = container.tx.Commit(ctx)
+	tx := d.getContextTransaction(ctx)
+	if tx != nil {
+		err = tx.tx.Commit(ctx)
 		if err != nil {
-			if err != pgx.ErrTxClosed &&
-				err != pgx.ErrTxCommitRollback {
-				_ = container.tx.Rollback(ctx)
+			_ = tx.tx.Rollback(ctx)
 
-				return d.HErr(err)
-			}
+			return d.HErr(err)
 		}
 	}
 
-	container.tx, err = d.Con.Begin(ctx)
+	tx.tx, err = d.Con.Begin(ctx)
 	if err != nil {
 		return d.HErr(err)
 	}
@@ -161,17 +150,26 @@ func (d *St) TransactionFn(ctx context.Context, f func(context.Context) error) e
 		ctx = context.Background()
 	}
 
-	if ctx, err = d.ContextWithTransaction(ctx); err != nil {
+	if ctx, err = d.contextWithTransaction(ctx); err != nil {
 		return err
 	}
-	defer func() { d.RollbackContextTransaction(ctx) }()
+	defer func() { d.rollbackContextTransaction(ctx) }()
 
 	err = f(ctx)
 	if err != nil {
 		return err
 	}
 
-	return d.CommitContextTransaction(ctx)
+	return d.commitContextTransaction(ctx)
+}
+
+func (d *St) TransactionAddAsyncCallback(ctx context.Context, f func()) {
+	tx := d.getContextTransaction(ctx)
+	if tx == nil {
+		go f()
+	} else {
+		tx.asyncCallbacks = append(tx.asyncCallbacks, f)
+	}
 }
 
 // query

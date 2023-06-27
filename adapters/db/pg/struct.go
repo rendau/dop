@@ -45,7 +45,8 @@ func (o *OptionsSt) mergeWithDefaults() {
 }
 
 type txContainerSt struct {
-	tx pgx.Tx
+	tx             pgx.Tx
+	asyncCallbacks []func()
 }
 
 type rowsSt struct {

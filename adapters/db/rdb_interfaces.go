@@ -41,11 +41,9 @@ type RDBConnectionWithHelpers interface {
 }
 
 type RDBContextTransaction interface {
-	ContextWithTransaction(ctx context.Context) (context.Context, error)
-	CommitContextTransaction(ctx context.Context) error
-	RollbackContextTransaction(ctx context.Context)
 	RenewContextTransaction(ctx context.Context) error
 	TransactionFn(ctx context.Context, f func(context.Context) error) error
+	TransactionAddAsyncCallback(ctx context.Context, f func())
 }
 
 type RDBRows interface {
