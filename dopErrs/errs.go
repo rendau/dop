@@ -11,7 +11,7 @@ func (e Err) Error() string {
 // ErrWithDesc
 
 type ErrWithDesc struct {
-	Err  Err
+	Err  error
 	Desc string
 }
 
@@ -22,7 +22,7 @@ func (e ErrWithDesc) Error() string {
 // FormErr
 
 type FormErr struct {
-	Fields map[string]Err
+	Fields map[string]error
 }
 
 func (e FormErr) Error() string {
